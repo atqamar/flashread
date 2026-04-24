@@ -1,0 +1,1926 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#0b0b0c" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#fafaf7" media="(prefers-color-scheme: light)" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Lexend:wght@300;400;500&display=swap" rel="stylesheet" />
+<title>Flash — fast reader</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>" />
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0b0c;
+    --bg-soft: #141416;
+    --fg: #f4f4f5;
+    --fg-dim: #9ca0a8;
+    --fg-faint: #4a4d54;
+    --accent: #e63757;
+    --border: #25262b;
+    --guide: #2a2b30;
+    --shadow: 0 10px 40px rgba(0,0,0,.4);
+    --reader-serif: "Iowan Old Style", "Palatino", "Georgia", "Times New Roman", serif;
+    --reader-font: var(--reader-serif); /* overridden by font selector */
+    --ui-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg: #fafaf7;
+    --bg-soft: #ffffff;
+    --fg: #1a1a1c;
+    --fg-dim: #6b6f76;
+    --fg-faint: #b8bcc3;
+    --accent: #c9203f;
+    --border: #e7e7e4;
+    --guide: #dcdcd8;
+    --shadow: 0 10px 40px rgba(30,30,30,.08);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--ui-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background .25s ease, color .25s ease;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+  /* Allow input form to use comfortable inputs on iOS (no 16px forced zoom) */
+  input, textarea, select { font-size: 16px; }
+  button, input, textarea, select {
+    font-family: inherit;
+    color: inherit;
+  }
+  button { cursor: pointer; }
+
+  /* ---------- Theme toggle ---------- */
+  .theme-toggle {
+    position: fixed; top: 16px; right: 16px;
+    width: 36px; height: 36px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg-soft);
+    color: var(--fg-dim);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 50;
+    transition: color .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .theme-toggle:hover { color: var(--fg); border-color: var(--fg-faint); }
+  body.reading .theme-toggle { display: none; }
+
+  /* ---------- Input view ---------- */
+  #input-view {
+    min-height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 48px 24px;
+  }
+  .brand {
+    font-family: var(--reader-serif);
+    font-size: 42px;
+    letter-spacing: -.02em;
+    margin: 0 0 6px;
+    font-weight: 500;
+  }
+  .brand .focal { color: var(--accent); }
+  .tagline {
+    color: var(--fg-dim); font-size: 14px; margin-bottom: 32px;
+  }
+  .card {
+    width: 100%; max-width: 640px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .tabs-row { display: flex; gap: 8px; align-items: stretch; margin-bottom: 14px; }
+  .tabs-row .tabs { flex: 1; margin-bottom: 0; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+  .clear-btn {
+    background: transparent;
+    color: var(--fg-dim);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    font-size: 12px;
+    letter-spacing: .02em;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+  }
+  .clear-btn:hover { color: var(--fg); border-color: var(--fg-faint); }
+  .tab {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    background: transparent;
+    color: var(--fg-dim);
+    border: 1px solid transparent;
+    border-radius: 10px;
+    transition: all .15s ease;
+  }
+  .tab.active {
+    background: var(--bg);
+    border-color: var(--border);
+    color: var(--fg);
+  }
+  .field { display: none; }
+  .field.active { display: block; }
+  textarea, input[type="url"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 15px;
+    resize: vertical;
+    outline: none;
+    transition: border-color .15s ease;
+  }
+  textarea { min-height: 180px; font-family: var(--ui-sans); }
+  textarea:focus, input[type="url"]:focus { border-color: var(--fg-faint); }
+
+  .options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+  .opt label {
+    display: block;
+    font-size: 11px;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: 6px;
+  }
+  .opt select, .opt input[type="number"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+  }
+  .opt.full { grid-column: 1 / -1; }
+
+  /* Custom font dropdown — each option renders in its own face */
+  .font-picker { position: relative; }
+  .font-picker-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--fg);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .font-picker-trigger:hover { border-color: var(--fg-faint); }
+  .font-picker-trigger .chev { color: var(--fg-dim); flex-shrink: 0; transition: transform .15s ease; }
+  .font-picker-trigger[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .font-picker-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .font-picker-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+    box-shadow: var(--shadow);
+    z-index: 100;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .font-picker-option {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 15px;
+    background: transparent;
+    border: none;
+    color: var(--fg);
+    text-align: left;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background .1s ease;
+  }
+  .font-picker-option:hover, .font-picker-option.active {
+    background: var(--bg);
+  }
+  .font-picker-option.active { color: var(--accent); }
+  .seg {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 3px;
+  }
+  .seg button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--fg-dim);
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 7px;
+    transition: all .15s ease;
+  }
+  .seg button.active {
+    background: var(--bg-soft);
+    color: var(--fg);
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  }
+  /* Weight picker: show each label in the reading font at the weight it represents */
+  .seg button[data-weight] { font-family: var(--reader-font); font-size: 15px; }
+  .seg button[data-weight="400"] { font-weight: 400; }
+  .seg button[data-weight="600"] { font-weight: 600; }
+  .seg button[data-weight="700"] { font-weight: 700; }
+  .primary {
+    margin-top: 20px;
+    width: 100%;
+    padding: 14px 16px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .01em;
+    transition: transform .08s ease, opacity .15s ease;
+  }
+  .primary:hover { opacity: .92; }
+  .primary:active { transform: translateY(1px); }
+  .primary[disabled] { opacity: .5; cursor: not-allowed; }
+  .status {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--fg-dim);
+    min-height: 18px;
+    text-align: center;
+  }
+  .status.error { color: var(--accent); }
+
+  /* ---------- Reader view ---------- */
+  #reader-view {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 100vh;          /* fallback */
+    height: 100dvh;         /* iOS Chrome / Safari: excludes URL bar dynamically */
+    display: none;
+    flex-direction: column;
+    background: var(--bg);
+  }
+  #reader-view.active { display: flex; }
+
+  .reader-stage {
+    flex: 1;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  /* Guide lines — subtle, inspired by the screenshot */
+  .guide-h {
+    position: absolute;
+    left: 12%; right: 12%;
+    height: 1px;
+    background: var(--guide);
+    opacity: .9;
+  }
+  .guide-h.top { top: calc(50% - var(--guide-gap, 80px)); }
+  .guide-h.bot { top: calc(50% + var(--guide-gap, 80px)); }
+  .guide-v {
+    position: absolute;
+    left: 50%;
+    width: 1px;
+    height: 18px;
+    background: var(--guide);
+  }
+  .guide-v.top { top: calc(50% - var(--guide-gap, 80px)); }
+  .guide-v.bot { top: calc(50% + var(--guide-gap, 80px) - 18px); }
+
+  .word {
+    display: inline-grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: baseline;
+    font-family: var(--reader-font);
+    font-size: min(var(--word-size, 72px), 14vw);
+    font-weight: var(--word-weight, 400);
+    /* Positive tracking reduces parafoveal crowding for letters flanking
+       the ORP anchor. Scaled up by weight. See Zorzi 2012; Perea 2012; Chung 2002. */
+    letter-spacing: var(--word-tracking, 0.025em);
+    line-height: 1;
+    user-select: none;
+    -webkit-user-select: none;
+    white-space: pre;
+    max-width: 100vw;
+    padding: 0 8px;
+    position: relative;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .word[data-weight="400"] { --word-tracking: 0.025em; }
+  .word[data-weight="600"] { --word-tracking: 0.034em; }
+  .word[data-weight="700"] { --word-tracking: 0.042em; }
+  .word .before { justify-self: end; text-align: right; color: var(--fg); }
+  .word .after  { justify-self: start; text-align: left; color: var(--fg); }
+  .word .focal  { color: var(--accent); }
+
+  /* Parafoveal-preview flankers — show prev/next unit in dim text.
+     Opacity is set via --flanker-opacity by JS (decays as WPM rises). */
+  .flanker {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--reader-font);
+    font-weight: var(--word-weight, 400);
+    font-size: calc(min(var(--word-size, 72px), 14vw) * 0.5);
+    color: var(--fg);
+    opacity: var(--flanker-opacity, 0);
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: 25vw;
+    overflow: hidden;
+    line-height: 1;
+    transition: opacity .25s ease;
+    z-index: 1;
+    letter-spacing: 0.03em;
+  }
+  /* Offsets are JS-driven: distance from viewport center to the word's edge + padding */
+  .flanker-prev {
+    right: calc(50% + var(--flanker-left-offset, 10vw));
+    text-align: right;
+    mask-image: linear-gradient(to right, transparent, black 40%);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 40%);
+  }
+  .flanker-next {
+    left: calc(50% + var(--flanker-right-offset, 10vw));
+    text-align: left;
+    mask-image: linear-gradient(to left, transparent, black 40%);
+    -webkit-mask-image: linear-gradient(to left, transparent, black 40%);
+  }
+  @media (max-width: 520px) {
+    .flanker { max-width: 28vw; font-size: calc(min(var(--word-size, 72px), 14vw) * 0.45); }
+  }
+
+  /* Book estimate — lives right under the scrub timeline, inside the bar */
+  .book-estimate {
+    color: var(--fg-dim);
+    font-size: 11px;
+    letter-spacing: .01em;
+    opacity: .7;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 4px;
+  }
+  .book-estimate strong { color: var(--fg); font-weight: 500; }
+
+  /* Big transient WPM readout above the top guide — shown during speed changes */
+  .wpm-overlay {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    margin-top: calc(-1 * (var(--guide-gap, 80px) + 96px));
+    text-align: center;
+    color: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity .25s ease, transform .25s ease;
+    z-index: 3;
+    line-height: 1;
+  }
+  .wpm-overlay .num {
+    display: block;
+    font-family: var(--reader-font);
+    font-weight: 500;
+    font-size: clamp(44px, 8vmin, 80px);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.015em;
+  }
+  .wpm-overlay .unit {
+    display: block;
+    font-family: var(--ui-sans);
+    font-weight: 400;
+    font-size: clamp(10px, 1.4vmin, 13px);
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    margin-top: 6px;
+    opacity: .7;
+  }
+  .wpm-overlay.show { opacity: .95; transform: translateY(0); }
+  #reader-view.hide-ui .wpm-overlay { opacity: 0; transform: translateY(6px); }
+
+  /* Thin always-visible progress line at the very top of the viewport */
+  .progress-line {
+    position: absolute;
+    top: 0; left: 0;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+    opacity: .35;
+    z-index: 4;
+    pointer-events: none;
+    transition: width .18s ease;
+  }
+
+  /* Persistent corner badges — always visible, bar covers them when shown */
+  .corner-badge {
+    position: absolute;
+    color: var(--fg-dim);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+    opacity: .6;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .wpm-badge {
+    left: calc(20px + env(safe-area-inset-left));
+    bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+  .progress-hint {
+    right: calc(20px + env(safe-area-inset-right));
+    bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+
+
+  /* Control bar — auto hides */
+  .controls {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 18px
+      calc(20px + env(safe-area-inset-right))
+      calc(16px + env(safe-area-inset-bottom))
+      calc(20px + env(safe-area-inset-left));
+    background: linear-gradient(to top, var(--bg) 60%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: opacity .35s ease, transform .35s ease;
+    z-index: 3;
+  }
+  #reader-view.hide-ui .controls { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  /* Top-right word counter stays; back button fades with the rest of the chrome */
+  #reader-view.hide-ui .top-bar .ghost-btn { opacity: 0; pointer-events: none; }
+  /* Corner badges (wpm, time-left, word-counter) remain visible always. */
+
+  .top-bar {
+    position: absolute;
+    top: calc(16px + env(safe-area-inset-top));
+    left: calc(16px + env(safe-area-inset-left));
+    right: calc(16px + env(safe-area-inset-right));
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px;
+    transition: opacity .35s ease;
+    z-index: 3;
+  }
+  .ghost-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    border-radius: 10px;
+    padding: 7px 11px;
+    font-size: 12px;
+    letter-spacing: .02em;
+    transition: all .15s ease;
+  }
+  .ghost-btn:hover { color: var(--fg); border-color: var(--fg-faint); }
+  .icon-btn { padding: 7px 8px; display: inline-flex; align-items: center; justify-content: center; }
+  .top-bar-group { display: flex; gap: 8px; align-items: center; }
+  .opt label .hint {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--fg-faint);
+  }
+
+  .scrub-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .time-label {
+    font-size: 11px;
+    color: var(--fg-dim);
+    font-variant-numeric: tabular-nums;
+    min-width: 42px;
+    letter-spacing: .02em;
+  }
+  .time-label:last-child { text-align: right; }
+  .word-counter {
+    color: var(--fg-faint);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: .02em;
+  }
+  .scrub {
+    flex: 1;
+    width: 100%;
+    height: 28px; /* larger hit area for touch */
+    -webkit-appearance: none; appearance: none;
+    background: transparent;
+    touch-action: pan-x;
+  }
+  .scrub::-webkit-slider-runnable-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 3px;
+  }
+  .scrub::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-top: -6px;
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+  .scrub::-moz-range-track { height: 3px; background: var(--border); border-radius: 3px; }
+  .scrub::-moz-range-thumb {
+    width: 14px; height: 14px; border: 2px solid var(--bg);
+    border-radius: 50%; background: var(--accent);
+  }
+
+  .ctrl-row {
+    display: flex; align-items: center; gap: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+    color: var(--fg-dim);
+    font-size: 12px;
+    letter-spacing: .02em;
+  }
+  .ctrl-group {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ctrl-group label { color: var(--fg-faint); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  .ctrl-group input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 120px;
+    background: transparent;
+  }
+  .ctrl-group input[type="range"]::-webkit-slider-runnable-track {
+    height: 2px; background: var(--border); border-radius: 2px;
+  }
+  .ctrl-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--fg-dim);
+    margin-top: -4px;
+  }
+  .ctrl-group input[type="range"]::-moz-range-track { height: 2px; background: var(--border); }
+  .ctrl-group input[type="range"]::-moz-range-thumb {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--fg-dim); border: none;
+  }
+  .ctrl-group .val { color: var(--fg); font-variant-numeric: tabular-nums; min-width: 40px; }
+
+  .play-btn {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .08s ease, opacity .15s ease;
+  }
+  .play-btn:hover { opacity: .9; }
+  .play-btn:active { transform: scale(.96); }
+
+  .kbd-hint {
+    text-align: center;
+    color: var(--fg-faint);
+    font-size: 11px;
+    letter-spacing: .04em;
+  }
+  .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; padding: 1px 5px; border: 1px solid var(--border); border-radius: 4px; }
+
+  /* Tap overlay on reader stage — full-area tap toggles play/pause on touch */
+  .tap-layer {
+    position: absolute; inset: 0;
+    z-index: 1;
+    touch-action: none;              /* iOS: we own all gestures here */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+  }
+  /* No iOS 300ms delay / double-tap zoom on interactive chrome */
+  button, input[type="range"], .tab, select { touch-action: manipulation; }
+
+  /* Reveal the kbd hint only where a keyboard is likely */
+  .kbd-hint { display: none; }
+  @media (hover: hover) and (pointer: fine) {
+    .kbd-hint { display: block; }
+  }
+  .tap-hint {
+    text-align: center;
+    color: var(--fg-faint);
+    font-size: 11px;
+    letter-spacing: .04em;
+    display: block;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tap-hint { display: none; }
+  }
+
+  @media (max-width: 520px) {
+    .brand { font-size: 34px; }
+    .options { grid-template-columns: 1fr; }
+    .card { padding: 18px; border-radius: 14px; }
+    .ctrl-group input[type="range"] { width: 90px; }
+    .ctrl-row { gap: 10px 14px; font-size: 11px; }
+    .ctrl-group label { font-size: 10px; }
+    .ctrl-group .val { min-width: 34px; font-size: 11px; }
+    .book-estimate, .progress-hint { font-size: 10px; }
+    .guide-h { left: 6%; right: 6%; }
+  }
+
+  /* Short viewports (e.g. landscape phone) */
+  @media (max-height: 520px) {
+    .book-estimate, .progress-hint { font-size: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+  <svg class="theme-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+</button>
+
+<!-- ============ INPUT VIEW ============ -->
+<main id="input-view">
+  <h1 class="brand">fl<span class="focal">a</span>sh</h1>
+  <div class="tagline">a rapid serial visual reader</div>
+
+  <div class="card">
+    <div class="tabs-row">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="text">Paste text</button>
+        <button class="tab" data-tab="url">From URL</button>
+      </div>
+      <button type="button" class="clear-btn" id="clearBtn" title="Clear input">Clear</button>
+    </div>
+
+    <div class="field active" data-field="text">
+      <textarea id="inputText" placeholder="Paste an article, a chapter, an essay…"></textarea>
+    </div>
+    <div class="field" data-field="url">
+      <input type="url" id="inputUrl" placeholder="https://example.com/long-article" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" />
+    </div>
+
+    <div class="options">
+      <div class="opt">
+        <label for="wpmInput">Starting speed (wpm)</label>
+        <input type="number" id="wpmInput" min="100" max="1200" step="25" value="350" inputmode="numeric" pattern="[0-9]*" />
+      </div>
+      <div class="opt">
+        <label>Reading font</label>
+        <div class="font-picker" id="fontPicker">
+          <button type="button" class="font-picker-trigger" id="fontTrigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="font-picker-label" id="fontLabel">Iowan Old Style</span>
+            <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="font-picker-menu" id="fontMenu" role="listbox" hidden></div>
+        </div>
+      </div>
+      <div class="opt full">
+        <label>Weight <span class="hint">(bolder = less edge-halo at speed)</span></label>
+        <div class="seg" id="weightSeg" role="tablist" aria-label="Font weight">
+          <button type="button" data-weight="400">Regular</button>
+          <button type="button" data-weight="600">Semibold</button>
+          <button type="button" data-weight="700">Bold</button>
+        </div>
+      </div>
+      <div class="opt full">
+        <label>Chunk size</label>
+        <div class="seg" id="chunkSeg" role="tablist" aria-label="Chunk size">
+          <button type="button" data-chunk="1">1 word</button>
+          <button type="button" data-chunk="2">2 words</button>
+          <button type="button" data-chunk="3">3 words</button>
+        </div>
+      </div>
+      <div class="opt full">
+        <label>Context preview <span class="hint">(prev/next word — auto-fades as WPM rises)</span></label>
+        <div class="seg" id="contextSeg" role="tablist" aria-label="Context preview">
+          <button type="button" data-ctx="off">Off</button>
+          <button type="button" data-ctx="auto">Auto-dim</button>
+        </div>
+      </div>
+      <div class="opt full">
+        <label for="bookSelect">Book gauge</label>
+        <select id="bookSelect"></select>
+      </div>
+    </div>
+
+    <button class="primary" id="startBtn">Start reading →</button>
+    <div class="status" id="status"></div>
+  </div>
+</main>
+
+<!-- ============ READER VIEW ============ -->
+<section id="reader-view">
+  <div class="progress-line" id="progressLine"></div>
+  <div class="top-bar">
+    <div class="top-bar-group">
+      <button class="ghost-btn" id="backBtn">← new text</button>
+      <button class="ghost-btn icon-btn" id="fsBtn" aria-label="Toggle fullscreen" title="Fullscreen (F)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>
+      </button>
+      <button class="ghost-btn icon-btn" id="readerThemeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="theme-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></svg>
+      </button>
+    </div>
+    <div class="word-counter" id="wordCounter">0 / 0</div>
+  </div>
+
+  <div class="reader-stage" id="readerStage">
+    <div class="tap-layer" id="tapLayer"></div>
+    <div class="guide-h top"></div>
+    <div class="guide-v top"></div>
+    <div class="wpm-overlay" id="wpmOverlay" aria-hidden="true">
+      <span class="num" id="wpmOverlayNum">350</span><span class="unit">wpm</span>
+    </div>
+    <div class="flanker flanker-prev" id="flankerPrev" aria-hidden="true"></div>
+    <div class="word" id="word">
+      <span class="before"></span><span class="focal"></span><span class="after"></span>
+    </div>
+    <div class="flanker flanker-next" id="flankerNext" aria-hidden="true"></div>
+    <div class="guide-v bot"></div>
+    <div class="guide-h bot"></div>
+
+    <!-- Persistent corner badges — sit below the controls bar (z-index 2),
+         so the bar covers them when visible and they remain when it fades. -->
+    <div class="corner-badge wpm-badge" id="wpmBadge">350 wpm</div>
+    <div class="corner-badge progress-hint" id="progressHint">0:00 left</div>
+  </div>
+
+  <div class="controls">
+    <div class="scrub-row">
+      <span class="time-label" id="timeElapsed">0:00</span>
+      <input type="range" class="scrub" id="scrub" min="0" max="100" value="0" />
+      <span class="time-label" id="timeTotal">0:00</span>
+    </div>
+    <div class="book-estimate" id="bookEstimate"></div>
+    <div class="ctrl-row">
+      <button class="play-btn" id="playBtn" aria-label="Play/pause">
+        <svg id="playIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <div class="ctrl-group">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="100" max="1200" step="25" value="350" />
+        <span class="val" id="speedVal">350 wpm</span>
+      </div>
+      <div class="ctrl-group">
+        <label>Size</label>
+        <input type="range" id="sizeSlider" min="36" max="240" step="2" value="72" />
+        <span class="val" id="sizeVal">72</span>
+      </div>
+    </div>
+    <div class="kbd-hint">
+      <span class="kbd">Space</span> play &nbsp;·&nbsp;
+      <span class="kbd">←</span> <span class="kbd">→</span> seek &nbsp;·&nbsp;
+      <span class="kbd">Shift</span>+<span class="kbd">←</span><span class="kbd">→</span> fast seek &nbsp;·&nbsp;
+      <span class="kbd">↑</span> <span class="kbd">↓</span> speed &nbsp;·&nbsp;
+      <span class="kbd">Shift</span>+<span class="kbd">↑</span><span class="kbd">↓</span> size &nbsp;·&nbsp;
+      <span class="kbd">Cmd</span>+<span class="kbd">B</span> weight &nbsp;·&nbsp;
+      <span class="kbd">F</span> fullscreen &nbsp;·&nbsp;
+      <span class="kbd">Esc</span> back
+    </div>
+    <div class="tap-hint">tap to play / pause &nbsp;·&nbsp; swipe ←→ to seek &nbsp;·&nbsp; swipe ↑↓ for speed</div>
+  </div>
+</section>
+
+<script>
+/* ======================================================================
+   Flash — RSVP reader
+   ====================================================================== */
+
+// ---------- Book catalog (word counts are well-known public estimates) ----------
+const BOOKS = [
+  { id: "hp1",  title: "Harry Potter and the Sorcerer's Stone", words: 76944 },
+  { id: "hp2",  title: "Harry Potter and the Chamber of Secrets", words: 85141 },
+  { id: "hp3",  title: "Harry Potter and the Prisoner of Azkaban", words: 107253 },
+  { id: "hp4",  title: "Harry Potter and the Goblet of Fire", words: 190637 },
+  { id: "hp5",  title: "Harry Potter and the Order of the Phoenix", words: 257045 },
+  { id: "hobbit", title: "The Hobbit", words: 95356 },
+  { id: "lotr1", title: "The Fellowship of the Ring", words: 177227 },
+  { id: "lotr2", title: "The Two Towers", words: 143436 },
+  { id: "lotr3", title: "The Return of the King", words: 134462 },
+  { id: "dune",  title: "Dune", words: 187240 },
+  { id: "1984",  title: "1984", words: 88942 },
+  { id: "pride", title: "Pride and Prejudice", words: 122685 },
+  { id: "gatsby", title: "The Great Gatsby", words: 47094 },
+  { id: "mockingbird", title: "To Kill a Mockingbird", words: 100388 },
+  { id: "moby", title: "Moby-Dick", words: 209117 },
+  { id: "war",  title: "War and Peace", words: 587287 },
+  { id: "catcher", title: "The Catcher in the Rye", words: 73404 },
+  { id: "monte", title: "The Count of Monte Cristo", words: 464234 },
+  { id: "jobs", title: "Steve Jobs (Isaacson)", words: 225000 },
+  { id: "sapiens", title: "Sapiens — Yuval Noah Harari", words: 148000 },
+  { id: "einstein", title: "Einstein: His Life and Universe", words: 230000 },
+];
+
+// ---------- Font catalog (reading-optimized) ----------
+const FONTS = [
+  { id: "iowan",     name: "Iowan Old Style",       stack: `"Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif` },
+  { id: "ny",        name: "New York",              stack: `"New York", ui-serif, "Times New Roman", serif` },
+  { id: "charter",   name: "Charter",               stack: `Charter, "Bitstream Charter", "Iowan Old Style", Cambria, Georgia, serif` },
+  { id: "georgia",   name: "Georgia",               stack: `Georgia, "Times New Roman", serif` },
+  { id: "palatino",  name: "Palatino",              stack: `Palatino, "Palatino Linotype", "Book Antiqua", serif` },
+  { id: "system",    name: "System Sans",           stack: `-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif` },
+  { id: "helvetica", name: "Helvetica Neue",        stack: `"Helvetica Neue", Helvetica, Arial, sans-serif` },
+  { id: "verdana",   name: "Verdana",               stack: `Verdana, Geneva, Tahoma, sans-serif` },
+  { id: "atkinson",  name: "Atkinson Hyperlegible", stack: `"Atkinson Hyperlegible", system-ui, sans-serif` },
+  { id: "lexend",    name: "Lexend",                stack: `"Lexend", system-ui, sans-serif` },
+];
+
+// ---------- State ----------
+const state = {
+  words: [],              // raw word list (timing & resume key are word-indexed)
+  units: [],              // display unit strings (1, 2, or 3 words per unit)
+  unitStart: [],          // unitStart[i] = word index where unit i begins
+  unitWords: [],          // unitWords[i] = word count in unit i
+  unitFocal: [],          // unitFocal[i] = ORP char index inside units[i]
+  chunkSize: Math.min(3, Math.max(1, parseInt(localStorage.getItem("flash.chunk"), 10) || 1)),
+  context: (localStorage.getItem("flash.context") === "auto") ? "auto" : "off",
+  weight: parseInt(localStorage.getItem("flash.weight"), 10) || 400,
+  index: 0,
+  wpm: 350,
+  fontId: localStorage.getItem("flash.font") || "iowan",
+  playing: false,
+  timer: null,
+  textHash: null,
+  stepsThisPlay: 0,
+  rewindOnResume: false,
+  bookId: localStorage.getItem("flash.book") || "hp1",
+  theme: localStorage.getItem("flash.theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"),
+};
+
+// cheap non-crypto hash for identifying previously-read text
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return String(h >>> 0);
+}
+
+// ---------- Theme ----------
+const THEME_ICON = {
+  light: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  dark:  '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+};
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", state.theme);
+  localStorage.setItem("flash.theme", state.theme);
+  const svg = THEME_ICON[state.theme];
+  document.querySelectorAll(".theme-icon").forEach(el => { el.innerHTML = svg; });
+}
+function toggleTheme() {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  applyTheme();
+}
+document.getElementById("themeToggle").onclick = toggleTheme;
+document.getElementById("readerThemeBtn").onclick = toggleTheme;
+applyTheme();
+
+// ---------- Book dropdown ----------
+const bookSelect = document.getElementById("bookSelect");
+BOOKS.forEach(b => {
+  const o = document.createElement("option");
+  o.value = b.id;
+  o.textContent = `${b.title} · ${b.words.toLocaleString()} words`;
+  bookSelect.appendChild(o);
+});
+bookSelect.value = state.bookId;
+bookSelect.onchange = () => {
+  state.bookId = bookSelect.value;
+  localStorage.setItem("flash.book", state.bookId);
+  renderBookEstimate();
+};
+
+// ---------- Custom font picker (each option renders in its own face) ----------
+const fontTrigger = document.getElementById("fontTrigger");
+const fontMenu = document.getElementById("fontMenu");
+const fontLabel = document.getElementById("fontLabel");
+
+FONTS.forEach(f => {
+  const opt = document.createElement("button");
+  opt.type = "button";
+  opt.className = "font-picker-option";
+  opt.dataset.font = f.id;
+  opt.textContent = f.name;
+  opt.style.fontFamily = f.stack; // <- the whole point: preview in the font
+  opt.setAttribute("role", "option");
+  opt.addEventListener("click", () => {
+    setFont(f.id);
+    closeFontMenu();
+  });
+  fontMenu.appendChild(opt);
+});
+
+function setFont(id) {
+  const f = FONTS.find(x => x.id === id) || FONTS[0];
+  state.fontId = f.id;
+  document.documentElement.style.setProperty("--reader-font", f.stack);
+  localStorage.setItem("flash.font", f.id);
+  fontLabel.textContent = f.name;
+  fontLabel.style.fontFamily = f.stack; // trigger text also renders in the font
+  fontMenu.querySelectorAll(".font-picker-option").forEach(o => {
+    o.classList.toggle("active", o.dataset.font === f.id);
+  });
+}
+
+function openFontMenu() {
+  fontMenu.hidden = false;
+  fontTrigger.setAttribute("aria-expanded", "true");
+}
+function closeFontMenu() {
+  fontMenu.hidden = true;
+  fontTrigger.setAttribute("aria-expanded", "false");
+}
+fontTrigger.addEventListener("click", (e) => {
+  e.stopPropagation();
+  fontMenu.hidden ? openFontMenu() : closeFontMenu();
+});
+document.addEventListener("click", (e) => {
+  if (!fontMenu.hidden && !fontMenu.contains(e.target) && e.target !== fontTrigger) {
+    closeFontMenu();
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (!fontMenu.hidden && e.key === "Escape") { closeFontMenu(); fontTrigger.focus(); }
+});
+
+setFont(state.fontId);
+
+// ---------- Chunk size segmented control ----------
+const chunkSeg = document.getElementById("chunkSeg");
+function setChunkSize(n) {
+  n = Math.min(3, Math.max(1, parseInt(n, 10) || 1));
+  state.chunkSize = n;
+  localStorage.setItem("flash.chunk", String(n));
+  setSegActive(chunkSeg, "chunk", n);
+  // If a reading session is already loaded, rebuild units and re-anchor position
+  if (state.words.length > 0) {
+    const wordIdx = state.unitStart[state.index] || 0;
+    buildUnits();
+    state.index = unitIndexForWord(wordIdx);
+    scrubEl.max = Math.max(0, state.units.length - 1);
+    renderWord();
+  }
+}
+chunkSeg.querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => setChunkSize(btn.dataset.chunk));
+});
+setChunkSize(state.chunkSize);
+
+// ---------- Font weight ----------
+const weightSeg = document.getElementById("weightSeg");
+function setWeight(w) {
+  const allowed = [400, 600, 700];
+  w = allowed.includes(parseInt(w, 10)) ? parseInt(w, 10) : 400;
+  state.weight = w;
+  document.documentElement.style.setProperty("--word-weight", String(w));
+  document.getElementById("word").setAttribute("data-weight", String(w));
+  localStorage.setItem("flash.weight", String(w));
+  setSegActive(weightSeg, "weight", w);
+}
+weightSeg.querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => setWeight(btn.dataset.weight));
+});
+setWeight(state.weight);
+
+// ---------- Context-preview (flanker words) ----------
+const contextSeg = document.getElementById("contextSeg");
+const flankerPrev = document.getElementById("flankerPrev");
+const flankerNext = document.getElementById("flankerNext");
+
+// Opacity curve: full visible at low wpm, decays smoothly past ~450 wpm.
+// 200 wpm → 0.40, 450 wpm → 0.28, 700 wpm → 0.14, 900 wpm → 0.06, 1200 wpm → 0.03
+function flankerOpacityForWpm(wpm) {
+  if (state.context !== "auto") return 0;
+  const t = Math.max(0, Math.min(1, (wpm - 200) / 800));
+  const eased = t * t;
+  return Math.max(0.03, 0.45 - 0.42 * eased);
+}
+function applyFlankerOpacity() {
+  const op = flankerOpacityForWpm(state.wpm);
+  document.documentElement.style.setProperty("--flanker-opacity", String(op));
+}
+const flankerCache = {
+  lastPrev: null,
+  lastNext: null,
+  stageWidth: 0,
+  centerX: 0,
+  pad: 0,
+  lastLeftOffset: -1,
+  lastRightOffset: -1,
+  lastTooTight: null,
+};
+function invalidateStageRect() {
+  flankerCache.stageWidth = 0; // force re-measure on next positionFlankers call
+}
+window.addEventListener("resize", () => {
+  invalidateStageRect();
+  if (state.context === "auto") requestAnimationFrame(positionFlankers);
+});
+
+function renderFlankers() {
+  // Hide flankers when context is off, no content loaded, or on a paragraph-break unit
+  if (state.context !== "auto" || state.units.length === 0 || state.unitIsBreak[state.index]) {
+    if (flankerCache.lastPrev !== "") { flankerPrev.textContent = ""; flankerCache.lastPrev = ""; }
+    if (flankerCache.lastNext !== "") { flankerNext.textContent = ""; flankerCache.lastNext = ""; }
+    return;
+  }
+  // Skip over adjacent break units when choosing flanker content — don't show "" on either side
+  let prev = "";
+  for (let k = state.index - 1; k >= 0; k--) {
+    if (!state.unitIsBreak[k]) { prev = state.units[k]; break; }
+  }
+  let next = "";
+  for (let k = state.index + 1; k < state.units.length; k++) {
+    if (!state.unitIsBreak[k]) { next = state.units[k]; break; }
+  }
+  if (prev !== flankerCache.lastPrev) { flankerPrev.textContent = prev; flankerCache.lastPrev = prev; }
+  if (next !== flankerCache.lastNext) { flankerNext.textContent = next; flankerCache.lastNext = next; }
+  requestAnimationFrame(positionFlankers);
+}
+
+// Place flankers flush outside the word's edges. Words are asymmetric around the focal
+// (e.g. "identity" with focal 'e' has 2 letters left, 5 right), so measure each side.
+function positionFlankers() {
+  if (state.context !== "auto") return;
+  // Stage geometry is invariant between resizes — cache it.
+  if (flankerCache.stageWidth === 0) {
+    const stageRect = wordEl.parentElement.getBoundingClientRect();
+    if (!stageRect.width) return;
+    flankerCache.stageWidth = stageRect.width;
+    flankerCache.centerX = stageRect.left + stageRect.width / 2;
+    flankerCache.pad = Math.max(24, stageRect.width * 0.025);
+  }
+  const wordRect = wordEl.getBoundingClientRect();
+  if (!wordRect.width) return;
+  const leftExtent  = Math.max(0, flankerCache.centerX - wordRect.left);
+  const rightExtent = Math.max(0, wordRect.right - flankerCache.centerX);
+  const leftOffset  = leftExtent  + flankerCache.pad;
+  const rightOffset = rightExtent + flankerCache.pad;
+  const tooTight = Math.min(flankerCache.stageWidth / 2 - leftOffset,
+                            flankerCache.stageWidth / 2 - rightOffset) < flankerCache.stageWidth * 0.12;
+
+  if (leftOffset !== flankerCache.lastLeftOffset) {
+    flankerCache.lastLeftOffset = leftOffset;
+    document.documentElement.style.setProperty("--flanker-left-offset", leftOffset + "px");
+  }
+  if (rightOffset !== flankerCache.lastRightOffset) {
+    flankerCache.lastRightOffset = rightOffset;
+    document.documentElement.style.setProperty("--flanker-right-offset", rightOffset + "px");
+  }
+  if (tooTight !== flankerCache.lastTooTight) {
+    flankerCache.lastTooTight = tooTight;
+    flankerPrev.style.visibility = tooTight ? "hidden" : "";
+    flankerNext.style.visibility = tooTight ? "hidden" : "";
+  }
+}
+
+function setContext(mode) {
+  state.context = (mode === "auto") ? "auto" : "off";
+  localStorage.setItem("flash.context", state.context);
+  setSegActive(contextSeg, "ctx", state.context);
+  applyFlankerOpacity();
+  renderFlankers();
+}
+contextSeg.querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => setContext(btn.dataset.ctx));
+});
+setContext(state.context);
+
+// ---------- Tabs ----------
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+    const tab = t.dataset.tab;
+    document.querySelectorAll(".field").forEach(f => f.classList.toggle("active", f.dataset.field === tab));
+  };
+});
+
+// ---------- Text fetching (URL → body) ----------
+async function fetchUrlText(url) {
+  // Try Jina Reader (clean markdown extraction, no key needed)
+  try {
+    const r = await fetch("https://r.jina.ai/" + url, { headers: { "Accept": "text/plain" } });
+    if (r.ok) {
+      const text = await r.text();
+      if (text && text.length > 200) return stripMarkdown(text);
+    }
+  } catch (e) { /* continue */ }
+
+  // Fallback: allorigins + local HTML extraction
+  const r2 = await fetch("https://api.allorigins.win/raw?url=" + encodeURIComponent(url));
+  if (!r2.ok) throw new Error("Could not fetch the URL (CORS or unreachable).");
+  const html = await r2.text();
+  return extractBodyText(html);
+}
+
+function stripMarkdown(md) {
+  // Jina Reader usually prepends a "Title: ... URL Source: ..." block; drop it.
+  let t = md.replace(/^Title:.*\n(?:URL Source:.*\n)?(?:Published Time:.*\n)?(?:Markdown Content:\n)?/i, "");
+  // Remove markdown images & links but keep link text
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // Remove headings' # markers
+  t = t.replace(/^#{1,6}\s+/gm, "");
+  // Remove code fences and inline code markers
+  t = t.replace(/```[\s\S]*?```/g, "");
+  t = t.replace(/`([^`]+)`/g, "$1");
+  // Bold/italic markers
+  t = t.replace(/(\*\*|__)(.*?)\1/g, "$2");
+  t = t.replace(/(\*|_)(.*?)\1/g, "$2");
+  // Collapse excessive whitespace
+  t = t.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  return t;
+}
+
+function extractBodyText(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script,style,noscript,nav,header,footer,aside,form,iframe,svg").forEach(el => el.remove());
+  // Prefer <article> if present
+  const container = doc.querySelector("article") || doc.querySelector("main") || doc.body;
+  const text = (container.innerText || container.textContent || "").trim();
+  return text.replace(/\n{3,}/g, "\n\n");
+}
+
+// ---------- Word tokenization ----------
+// Sentinel inserted into state.words at paragraph boundaries. Renders as a silent pause.
+const PARA_BREAK = "\x00";
+function tokenize(text) {
+  // Split on blank-line boundaries first so paragraph structure survives tokenization.
+  const paragraphs = text.split(/\n\s*\n+/).map(p => p.trim()).filter(Boolean);
+  const out = [];
+  paragraphs.forEach((p, i) => {
+    p.split(/\s+/).forEach(w => { w = w.trim(); if (w) out.push(w); });
+    if (i < paragraphs.length - 1) out.push(PARA_BREAK);
+  });
+  return out;
+}
+
+// ---------- Chunking ----------
+const CHUNK_MAX_CHARS = 18;
+function buildUnits() {
+  state.units = [];
+  state.unitStart = [];
+  state.unitWords = [];
+  state.unitFocal = [];
+  state.unitBefore = [];  // precomputed slices — avoids per-tick string allocation
+  state.unitFocalCh = [];
+  state.unitAfter = [];
+  state.unitIsBreak = [];
+  const size = state.chunkSize || 1;
+  let i = 0;
+  while (i < state.words.length) {
+    // Paragraph break sentinel → standalone silent unit
+    if (state.words[i] === PARA_BREAK) {
+      state.unitStart.push(i);
+      state.units.push("");
+      state.unitWords.push(1);
+      state.unitFocal.push(0);
+      state.unitBefore.push("");
+      state.unitFocalCh.push("");
+      state.unitAfter.push("");
+      state.unitIsBreak.push(true);
+      i++;
+      continue;
+    }
+    state.unitStart.push(i);
+    const chunk = [];
+    let chars = 0;
+    while (i < state.words.length && chunk.length < size) {
+      const w = state.words[i];
+      if (w === PARA_BREAK) break; // never cross a paragraph boundary within a chunk
+      const projected = chars + (chunk.length ? 1 : 0) + w.length;
+      if (chunk.length > 0 && projected > CHUNK_MAX_CHARS) break;
+      chunk.push(w);
+      chars = projected;
+      i++;
+      if (/[.!?]$/.test(w)) break;
+    }
+    const unit = chunk.join(" ");
+    const fi = focalIndexInUnit(unit, chunk);
+    state.units.push(unit);
+    state.unitWords.push(chunk.length);
+    state.unitFocal.push(fi);
+    state.unitBefore.push(unit.slice(0, fi));
+    state.unitFocalCh.push(unit.slice(fi, fi + 1));
+    state.unitAfter.push(unit.slice(fi + 1));
+    state.unitIsBreak.push(false);
+  }
+}
+
+// ---------- Focal letter position (ORP) ----------
+function focalIndex(word) {
+  // Strip leading punctuation for focal math, but render original
+  const stripped = word.replace(/^[^A-Za-z0-9]+/, "");
+  const offset = word.length - stripped.length;
+  const len = stripped.length;
+  let idx;
+  if (len <= 1) idx = 0;
+  else if (len <= 5) idx = 1;
+  else if (len <= 9) idx = 2;
+  else if (len <= 13) idx = 3;
+  else idx = 4;
+  return Math.min(word.length - 1, offset + idx);
+}
+
+// ORP for a unit: anchor on the middle word's focal letter, offset by the prefix.
+function focalIndexInUnit(unit, parts) {
+  parts = parts || unit.split(" ");
+  if (parts.length <= 1) return focalIndex(unit);
+  const mid = Math.floor(parts.length / 2);
+  let offset = 0;
+  for (let i = 0; i < mid; i++) offset += parts[i].length + 1;
+  return offset + focalIndex(parts[mid]);
+}
+
+// ---------- Rendering ----------
+const wordEl = document.getElementById("word");
+const beforeSpan = wordEl.querySelector(".before");
+const focalSpan = wordEl.querySelector(".focal");
+const afterSpan = wordEl.querySelector(".after");
+
+// Hot-path DOM refs — cached once, reused every tick (100+ Hz at high WPM)
+const scrubEl         = document.getElementById("scrub");
+const timeElapsedEl   = document.getElementById("timeElapsed");
+const timeTotalEl     = document.getElementById("timeTotal");
+const wordCounterEl   = document.getElementById("wordCounter");
+const progressHintEl  = document.getElementById("progressHint");
+const progressLineEl  = document.getElementById("progressLine");
+const wpmBadgeEl      = document.getElementById("wpmBadge");
+
+// Per-session invariants — recomputed when text or wpm changes, not every tick
+const progressCache = {
+  totalWords: 0,
+  totalSecs: 0,
+  totalSecsFmt: "0:00",
+  totalWordsFmt: "0",
+  lastElapsedSecs: -1,
+  lastRemainingSecs: -1,
+  lastCurrentWord: -1,
+  lastPctTenths: -1,
+};
+function refreshProgressInvariants() {
+  progressCache.totalWords = state.words.length;
+  progressCache.totalSecs = Math.round(progressCache.totalWords * (60 / state.wpm));
+  progressCache.totalSecsFmt = fmtTime(progressCache.totalSecs);
+  progressCache.totalWordsFmt = progressCache.totalWords.toLocaleString();
+  progressCache.lastElapsedSecs = -1;
+  progressCache.lastRemainingSecs = -1;
+  progressCache.lastCurrentWord = -1;
+  progressCache.lastPctTenths = -1;
+  timeTotalEl.textContent = progressCache.totalSecsFmt;
+}
+
+function renderWord() {
+  if (state.units.length === 0) {
+    beforeSpan.textContent = "";
+    focalSpan.textContent = "·";
+    afterSpan.textContent = "";
+    return;
+  }
+  const i = state.index;
+  if (state.unitIsBreak[i]) {
+    // Paragraph break — blank the word (zero-width space keeps grid stable)
+    beforeSpan.textContent = "";
+    focalSpan.textContent = "​";
+    afterSpan.textContent = "";
+  } else {
+    beforeSpan.textContent = state.unitBefore[i];
+    focalSpan.textContent  = state.unitFocalCh[i];
+    afterSpan.textContent  = state.unitAfter[i];
+  }
+  scrubEl.value = i;
+  renderFlankers();
+  renderProgress();
+}
+
+function blankWord() {
+  // Invisible but keep layout stable — use zero-width space so the grid doesn't jump.
+  beforeSpan.textContent = "";
+  focalSpan.textContent = "​";
+  afterSpan.textContent = "";
+}
+
+function renderProgress() {
+  const { totalWords, totalSecs, totalSecsFmt, totalWordsFmt } = progressCache;
+  const currentWord = state.unitStart[state.index] || 0;
+  if (currentWord === progressCache.lastCurrentWord) return;
+  progressCache.lastCurrentWord = currentWord;
+
+  const elapsedSecs = Math.round(currentWord * (60 / state.wpm));
+  if (elapsedSecs !== progressCache.lastElapsedSecs) {
+    progressCache.lastElapsedSecs = elapsedSecs;
+    timeElapsedEl.textContent = fmtTime(elapsedSecs);
+    const remaining = Math.max(0, totalSecs - elapsedSecs);
+    if (remaining !== progressCache.lastRemainingSecs) {
+      progressCache.lastRemainingSecs = remaining;
+      progressHintEl.textContent = `${fmtTime(remaining)} left`;
+    }
+  }
+  wordCounterEl.textContent = `${currentWord.toLocaleString()} / ${totalWordsFmt}`;
+
+  // Progress line — snap to 0.1% so we don't write the same width string repeatedly
+  const pctTenths = totalWords > 1 ? Math.round((currentWord / (totalWords - 1)) * 1000) : 0;
+  if (pctTenths !== progressCache.lastPctTenths) {
+    progressCache.lastPctTenths = pctTenths;
+    progressLineEl.style.width = (pctTenths / 10) + "%";
+  }
+}
+
+function fmtTime(secs) {
+  if (!isFinite(secs) || secs < 0) secs = 0;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+
+function fmtBookTime(secs) {
+  if (!isFinite(secs) || secs < 0) secs = 0;
+  const days = Math.floor(secs / 86400);
+  const hrs = Math.floor((secs % 86400) / 3600);
+  const mins = Math.floor((secs % 3600) / 60);
+  const parts = [];
+  if (days) parts.push(days + "d");
+  if (hrs) parts.push(hrs + "h");
+  if (mins || parts.length === 0) parts.push(mins + "m");
+  return parts.join(" ");
+}
+
+function renderBookEstimate() {
+  const book = BOOKS.find(b => b.id === state.bookId) || BOOKS[0];
+  const secs = (book.words / state.wpm) * 60;
+  const el = document.getElementById("bookEstimate");
+  el.title = `at ${state.wpm} wpm you'd finish ${book.title} in ${fmtBookTime(secs)}`;
+  el.innerHTML =
+    `<strong>${book.title}</strong> · ` +
+    `<strong>${fmtBookTime(secs)}</strong> at ${state.wpm} wpm`;
+}
+
+// ---------- Playback ----------
+const EASE_IN_STEPS = 5;        // first N units of a play session are slowed
+const EASE_IN_FACTOR = 1.6;     // start at 1.6x slot time, lerp to 1x
+function tickDelay(unit, wordsInUnit, isBreak) {
+  if (isBreak) {
+    // Paragraph micropause — scaled with wpm so it feels proportional, floored at 200ms
+    return Math.max(200, (60000 / state.wpm) * 2.5);
+  }
+  let base = (60000 / state.wpm) * wordsInUnit;
+  if (state.stepsThisPlay < EASE_IN_STEPS) {
+    const t = state.stepsThisPlay / EASE_IN_STEPS;
+    base *= EASE_IN_FACTOR + (1 - EASE_IN_FACTOR) * t;
+  }
+  const lastSpace = unit.lastIndexOf(" ");
+  const last = lastSpace >= 0 ? unit.slice(lastSpace + 1) : unit;
+  if (/[.!?]$/.test(last)) base *= 1.7;
+  else if (/[,;:]$/.test(last)) base *= 1.3;
+  else if (last.length >= 9) base *= 1.08;
+  return base;
+}
+
+// Inter-word blank frame: show word for ~95% of its slot, blank for ~5%,
+// with the blank floored at ~1 display frame so it actually renders at high wpm.
+const BLANK_RATIO = 0.05;
+const BLANK_MIN_MS = 16; // one 60Hz frame
+
+// Drift-corrected scheduler: every tick anchors to an absolute performance.now() target,
+// so cumulative timing stays accurate even if setTimeout fires a few ms late each time.
+// Critical at high WPM — at 1200 wpm a 3ms per-tick drift = ~6% slower than advertised.
+let tickAnchor = 0;
+function scheduleAt(targetMs, fn) {
+  const delay = Math.max(0, targetMs - performance.now());
+  state.timer = setTimeout(fn, delay);
+}
+function scheduleNext() {
+  if (!state.playing) return;
+  if (state.index >= state.units.length - 1) { pause(); return; }
+
+  const ni = state.index + 1;
+  const full = tickDelay(state.units[ni], state.unitWords[ni], state.unitIsBreak[ni]);
+  const blankMs = Math.max(full * BLANK_RATIO, BLANK_MIN_MS);
+  const showMs = Math.max(0, full - blankMs);
+
+  const blankAt = tickAnchor + showMs;
+  const advanceAt = tickAnchor + showMs + blankMs;
+
+  scheduleAt(blankAt, () => {
+    if (!state.playing) return;
+    blankWord();
+    scheduleAt(advanceAt, () => {
+      if (!state.playing) return;
+      tickAnchor = advanceAt; // anchor the next iteration to the ideal target, not actual fire time
+      state.index++;
+      state.stepsThisPlay++;
+      renderWord();
+      scheduleNext();
+    });
+  });
+}
+
+function play() {
+  if (state.units.length === 0) return;
+  if (state.index >= state.units.length - 1) state.index = 0;
+  if (state.rewindOnResume && state.index > 2) {
+    state.index = Math.max(0, state.index - 2);
+  }
+  state.rewindOnResume = false;
+  state.stepsThisPlay = 0;
+  state.playing = true;
+  updatePlayIcon();
+  renderWord();
+  tickAnchor = performance.now(); // fresh baseline for drift correction
+  scheduleNext();
+  scheduleHideUI();
+}
+
+function pause() {
+  const wasPlaying = state.playing;
+  state.playing = false;
+  updatePlayIcon();
+  clearTimeout(state.timer);
+  renderWord(); // ensure current word is shown, not blank
+  showUI();
+  if (wasPlaying) {
+    state.rewindOnResume = true;
+    saveResumePosition();
+  }
+}
+
+const RESUME_LRU_CAP = 50;
+function saveResumePosition() {
+  if (!state.textHash) return;
+  const wordIdx = state.unitStart[state.index] || 0;
+  try {
+    localStorage.setItem("flash.pos." + state.textHash, String(wordIdx));
+    // Maintain a bounded MRU list so old keys get evicted.
+    let mru = [];
+    try { mru = JSON.parse(localStorage.getItem("flash.pos.index") || "[]"); } catch (e) {}
+    mru = mru.filter(h => h !== state.textHash);
+    mru.unshift(state.textHash);
+    while (mru.length > RESUME_LRU_CAP) {
+      const evicted = mru.pop();
+      localStorage.removeItem("flash.pos." + evicted);
+    }
+    localStorage.setItem("flash.pos.index", JSON.stringify(mru));
+  } catch (e) {}
+}
+
+// Find the unit index whose starting word is closest to (but not past) the given word index.
+function unitIndexForWord(wordIdx) {
+  let lo = 0, hi = state.unitStart.length - 1, best = 0;
+  while (lo <= hi) {
+    const m = (lo + hi) >> 1;
+    if (state.unitStart[m] <= wordIdx) { best = m; lo = m + 1; }
+    else hi = m - 1;
+  }
+  return best;
+}
+
+function togglePlay() { state.playing ? pause() : play(); }
+
+function updatePlayIcon() {
+  const ic = document.getElementById("playIcon");
+  if (state.playing) {
+    ic.innerHTML = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  } else {
+    ic.innerHTML = '<path d="M8 5v14l11-7z"/>';
+  }
+}
+
+function jumpTo(idx) {
+  state.index = Math.max(0, Math.min(state.units.length - 1, idx));
+  state.rewindOnResume = false; // manual jump — don't re-rewind on resume
+  renderWord();
+}
+function seek(delta) { jumpTo(state.index + delta); }
+
+// Toggle `.active` on any segmented-control's children based on a matching data attribute.
+function setSegActive(container, dataAttr, value) {
+  container.querySelectorAll("button").forEach(b => {
+    b.classList.toggle("active", b.dataset[dataAttr] === String(value));
+  });
+}
+
+// ---------- UI auto-hide ----------
+let hideTimer;
+const readerView = document.getElementById("reader-view");
+function showUI() {
+  readerView.classList.remove("hide-ui");
+  clearTimeout(hideTimer);
+  if (state.playing) scheduleHideUI();
+}
+function scheduleHideUI() {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (state.playing) readerView.classList.add("hide-ui");
+  }, 1800);
+}
+readerView.addEventListener("mousemove", showUI);
+
+// ---------- Touch gestures on the reader stage ----------
+// Tap = play/pause, horizontal swipe = seek, vertical swipe = speed
+(function wireTouch() {
+  const layer = document.getElementById("tapLayer");
+  let startX = 0, startY = 0, startT = 0, moved = false, axis = null;
+  const SWIPE_MIN = 30;        // px threshold to start registering a swipe
+  const SEEK_STEP_PX = 24;     // px per word of seek
+  const SPEED_STEP_PX = 18;    // px per 25 wpm
+
+  layer.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY; startT = Date.now();
+    moved = false; axis = null;
+    showUI();
+  }, { passive: true });
+
+  layer.addEventListener("touchmove", (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    if (!axis) {
+      if (Math.abs(dx) > SWIPE_MIN && Math.abs(dx) > Math.abs(dy)) axis = "x";
+      else if (Math.abs(dy) > SWIPE_MIN && Math.abs(dy) > Math.abs(dx)) axis = "y";
+    }
+    if (axis === "x") {
+      // Seek while dragging: snap to word units
+      const delta = Math.trunc(dx / SEEK_STEP_PX);
+      if (delta !== layer._lastSeek) {
+        const step = delta - (layer._lastSeek || 0);
+        seek(step);
+        layer._lastSeek = delta;
+        moved = true;
+      }
+    } else if (axis === "y") {
+      // Vertical swipe changes wpm (up = faster, down = slower)
+      const delta = Math.trunc(-dy / SPEED_STEP_PX);
+      if (delta !== layer._lastSpeed) {
+        const diff = (delta - (layer._lastSpeed || 0)) * 25;
+        setWpm(state.wpm + diff);
+        layer._lastSpeed = delta;
+        moved = true;
+        flashWpmOverlay();
+      }
+    }
+  }, { passive: true });
+
+  let lastTouchEnd = 0;
+  layer.addEventListener("touchend", () => {
+    const dt = Date.now() - startT;
+    const wasTap = !moved && dt < 350;
+    layer._lastSeek = 0;
+    layer._lastSpeed = 0;
+    if (wasTap) togglePlay();
+    lastTouchEnd = Date.now();
+  }, { passive: true });
+
+  // Suppress click if touch just fired, to avoid iOS synthesized double-toggle.
+  layer.addEventListener("click", () => {
+    if (Date.now() - lastTouchEnd < 600) return;
+    togglePlay();
+  });
+})();
+
+// ---------- Controls ----------
+const scrub = document.getElementById("scrub");
+scrub.addEventListener("input", () => jumpTo(parseInt(scrub.value, 10)));
+document.getElementById("playBtn").onclick = togglePlay;
+document.getElementById("backBtn").onclick = () => {
+  pause();
+  saveResumePosition();
+  readerView.classList.remove("active");
+  document.body.classList.remove("reading");
+  document.getElementById("input-view").style.display = "";
+};
+
+const speedSlider = document.getElementById("speedSlider");
+const speedVal = document.getElementById("speedVal");
+speedSlider.addEventListener("input", () => {
+  setWpm(parseInt(speedSlider.value, 10));
+  flashWpmOverlay();
+});
+function setWpm(w) {
+  state.wpm = Math.max(100, Math.min(1200, w));
+  speedSlider.value = state.wpm;
+  speedVal.textContent = `${state.wpm} wpm`;
+  wpmBadgeEl.textContent = `${state.wpm} wpm`;
+  localStorage.setItem("flash.wpm", state.wpm);
+  applyFlankerOpacity();
+  renderBookEstimate();
+  refreshProgressInvariants();
+  renderProgress();
+}
+
+// Large red WPM overlay above the top guide — flashes during user-initiated speed changes.
+const wpmOverlayEl = document.getElementById("wpmOverlay");
+const wpmOverlayNumEl = document.getElementById("wpmOverlayNum");
+let wpmOverlayTimer;
+function flashWpmOverlay() {
+  wpmOverlayNumEl.textContent = state.wpm;
+  wpmOverlayEl.classList.add("show");
+  clearTimeout(wpmOverlayTimer);
+  wpmOverlayTimer = setTimeout(() => wpmOverlayEl.classList.remove("show"), 1400);
+}
+
+// Cycle through the three weight settings (for Cmd/Ctrl+B shortcut)
+const WEIGHT_CYCLE = [400, 600, 700];
+function cycleWeight() {
+  const i = WEIGHT_CYCLE.indexOf(state.weight);
+  setWeight(WEIGHT_CYCLE[(i + 1) % WEIGHT_CYCLE.length]);
+}
+
+const sizeSlider = document.getElementById("sizeSlider");
+const sizeVal = document.getElementById("sizeVal");
+function applySize(px, persist) {
+  const root = document.documentElement.style;
+  root.setProperty("--word-size", px + "px");
+  root.setProperty("--guide-gap", Math.round(px * 1.25) + "px");
+  sizeSlider.value = px;
+  sizeVal.textContent = px;
+  if (persist) localStorage.setItem("flash.size", px);
+  requestAnimationFrame(positionFlankers);
+}
+sizeSlider.addEventListener("input", () => applySize(parseInt(sizeSlider.value, 10), true));
+
+// ---------- Keyboard ----------
+window.addEventListener("keydown", (e) => {
+  if (!readerView.classList.contains("active")) return;
+  // don't intercept typing
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+  // Cmd/Ctrl+B cycles through the three weight settings
+  if ((e.metaKey || e.ctrlKey) && (e.key === "b" || e.key === "B")) {
+    e.preventDefault();
+    cycleWeight();
+    showUI();
+    return;
+  }
+
+  switch (e.key) {
+    case " ":
+      e.preventDefault();
+      togglePlay();
+      break;
+    case "ArrowLeft":
+      e.preventDefault();
+      seek(e.shiftKey ? -25 : -1);
+      showUI();
+      break;
+    case "ArrowRight":
+      e.preventDefault();
+      seek(e.shiftKey ? 25 : 1);
+      showUI();
+      break;
+    case "ArrowUp":
+      e.preventDefault();
+      if (e.shiftKey) {
+        applySize(Math.min(240, parseInt(sizeSlider.value, 10) + 8), true);
+      } else {
+        setWpm(state.wpm + 25);
+        flashWpmOverlay();
+      }
+      showUI();
+      break;
+    case "ArrowDown":
+      e.preventDefault();
+      if (e.shiftKey) {
+        applySize(Math.max(36, parseInt(sizeSlider.value, 10) - 8), true);
+      } else {
+        setWpm(state.wpm - 25);
+        flashWpmOverlay();
+      }
+      showUI();
+      break;
+    case "Home":
+      e.preventDefault();
+      jumpTo(0);
+      showUI();
+      break;
+    case "End":
+      e.preventDefault();
+      jumpTo(state.units.length - 1);
+      if (state.playing) pause();
+      showUI();
+      break;
+    case "Escape":
+      // If we locked Esc via Keyboard Lock, we now own the exit ourselves.
+      if (escLocked && (document.fullscreenElement || document.webkitFullscreenElement)) {
+        e.preventDefault();
+        toggleFullscreen();
+        return;
+      }
+      // Otherwise let the browser exit fullscreen natively if applicable.
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      e.preventDefault();
+      document.getElementById("backBtn").click();
+      break;
+    case "f":
+    case "F":
+      e.preventDefault();
+      toggleFullscreen();
+      break;
+  }
+});
+
+// ---------- Fullscreen ----------
+// Chromium-based browsers show a "Press Esc to exit full screen" overlay on
+// fullscreen entry. The Keyboard Lock API suppresses that overlay because the
+// browser trusts our page to handle Esc itself. Not supported in Safari / Firefox —
+// the overlay still shows there; can't be overridden.
+let escLocked = false;
+async function toggleFullscreen() {
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+  if (fsEl) {
+    if (escLocked && navigator.keyboard && navigator.keyboard.unlock) {
+      navigator.keyboard.unlock();
+      escLocked = false;
+    }
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+  } else {
+    const target = document.documentElement;
+    try {
+      if (target.requestFullscreen) await target.requestFullscreen();
+      else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+      if (navigator.keyboard && navigator.keyboard.lock) {
+        try {
+          await navigator.keyboard.lock(["Escape"]);
+          escLocked = true;
+        } catch (e) { /* lock unavailable; overlay will appear */ }
+      }
+    } catch (e) { /* user cancelled / browser denied */ }
+  }
+}
+document.getElementById("fsBtn").addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleFullscreen();
+});
+// Keep escLocked in sync if the user exits fullscreen via browser chrome.
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement && escLocked) {
+    if (navigator.keyboard && navigator.keyboard.unlock) navigator.keyboard.unlock();
+    escLocked = false;
+  }
+});
+
+// ---------- Auto-pause when tab/window goes away ----------
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && state.playing) pause();
+});
+window.addEventListener("blur", () => {
+  if (state.playing) pause();
+});
+
+// ---------- Start reading ----------
+const statusEl = document.getElementById("status");
+const startBtn = document.getElementById("startBtn");
+
+async function start() {
+  statusEl.className = "status";
+  statusEl.textContent = "";
+  startBtn.disabled = true;
+
+  const activeField = document.querySelector(".tab.active").dataset.tab;
+  let text = "";
+  try {
+    if (activeField === "text") {
+      text = document.getElementById("inputText").value.trim();
+      if (!text) throw new Error("Paste some text first.");
+    } else {
+      const url = document.getElementById("inputUrl").value.trim();
+      if (!url) throw new Error("Enter a URL.");
+      statusEl.textContent = "Fetching & extracting…";
+      text = await fetchUrlText(url);
+      if (!text || text.length < 40) throw new Error("Couldn't extract readable text from that page.");
+    }
+  } catch (err) {
+    statusEl.className = "status error";
+    statusEl.textContent = err.message || String(err);
+    startBtn.disabled = false;
+    return;
+  }
+
+  const words = tokenize(text);
+  if (words.length === 0) {
+    statusEl.className = "status error";
+    statusEl.textContent = "No words found.";
+    startBtn.disabled = false;
+    return;
+  }
+
+  state.words = words;
+  buildUnits();
+  refreshProgressInvariants();
+  state.textHash = hashStr(text);
+  // Resume from last word position (chunk-size-independent) if available
+  let resumedWord = 0;
+  try {
+    const saved = parseInt(localStorage.getItem("flash.pos." + state.textHash), 10);
+    if (Number.isFinite(saved) && saved > 5 && saved < words.length - 1) {
+      resumedWord = saved;
+    }
+  } catch (e) {}
+  state.index = resumedWord > 0 ? unitIndexForWord(resumedWord) : 0;
+  state.rewindOnResume = resumedWord > 0;
+  if (resumedWord > 0) {
+    statusEl.className = "status";
+    statusEl.textContent = `resuming at word ${resumedWord.toLocaleString()} of ${words.length.toLocaleString()}`;
+  }
+  state.wpm = Math.max(100, Math.min(1200, parseInt(document.getElementById("wpmInput").value, 10) || 350));
+  setWpm(state.wpm);
+
+  const savedSize = parseInt(localStorage.getItem("flash.size"), 10);
+  applySize(savedSize || parseInt(sizeSlider.value, 10) || 72, false);
+
+  scrub.max = Math.max(0, state.units.length - 1);
+  scrub.value = state.index;
+
+  renderWord();
+  renderBookEstimate();
+  renderProgress();
+
+  document.getElementById("input-view").style.display = "none";
+  readerView.classList.add("active");
+  document.body.classList.add("reading");
+
+  startBtn.disabled = false;
+  setTimeout(play, 300);
+}
+startBtn.addEventListener("click", start);
+
+// Hydrate saved preferences + input content
+(function hydrate() {
+  const savedWpm = parseInt(localStorage.getItem("flash.wpm"), 10);
+  if (savedWpm) document.getElementById("wpmInput").value = savedWpm;
+
+  const savedText = localStorage.getItem("flash.input.text");
+  const savedUrl  = localStorage.getItem("flash.input.url");
+  const savedTab  = localStorage.getItem("flash.input.tab");
+  if (savedText) document.getElementById("inputText").value = savedText;
+  if (savedUrl)  document.getElementById("inputUrl").value  = savedUrl;
+  if (savedTab === "url") {
+    document.querySelector('.tab[data-tab="url"]').click();
+  }
+})();
+
+// Persist input content on each keystroke so refresh never loses a paste
+document.getElementById("inputText").addEventListener("input", (e) => {
+  localStorage.setItem("flash.input.text", e.target.value);
+});
+document.getElementById("inputUrl").addEventListener("input", (e) => {
+  localStorage.setItem("flash.input.url", e.target.value);
+});
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => localStorage.setItem("flash.input.tab", t.dataset.tab));
+});
+
+// Clear button — wipes the currently-active field (and its storage)
+document.getElementById("clearBtn").addEventListener("click", () => {
+  const active = document.querySelector(".tab.active").dataset.tab;
+  if (active === "text") {
+    document.getElementById("inputText").value = "";
+    localStorage.removeItem("flash.input.text");
+    document.getElementById("inputText").focus();
+  } else {
+    document.getElementById("inputUrl").value = "";
+    localStorage.removeItem("flash.input.url");
+    document.getElementById("inputUrl").focus();
+  }
+  statusEl.className = "status";
+  statusEl.textContent = "";
+});
+</script>
+</body>
+</html>
